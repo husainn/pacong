@@ -3,7 +3,7 @@ import requests
 import threading
 from queue import Queue
 
-
+link_queue = Queue()
 
 def fetch(url):
     '''抓取数据'''
@@ -28,6 +28,16 @@ def parse_univerity(url):
                 data[keys[i]] = values[i]
     return data
 
+def download():
+    while True:
+        link = link_queue.get()
+        if link is None:
+            break
+        data = parse_univerity(link)
+        process_data(data)
+        link_queue.task_done()
+        print('remaining queue %s' % link_queue.qsize())
+
 def process_data(data):
     '''处理数据'''
     if data:
@@ -36,6 +46,7 @@ def process_data(data):
 
 if __name__ == '__main__':
     start_url = "http://www.qianmu.org/ranking/902.htm"
+    threads = []
     #1.请求入口页面
     se = etree.HTML(fetch(start_url))
     #2.提取列表页面的链接
@@ -43,6 +54,21 @@ if __name__ == '__main__':
     for link in links:
         if not link.startswith('http://www.qianmu.org'):
             link = "http://www.qianmu.org/%s" % link
-        #提取详情页的信息
-        data = parse_univerity(link)
-        process_data(data)
+        link_queue.put(link)
+    for i in range(5):
+            t =threading.Thread(target=download)
+            t.start()
+            threads.append(t)
+    link_queue.join()
+
+    for i in range(5):
+        link_queue.put(None)
+
+    for t in threads:
+        t.join()
+
+
+
+    print('end')
+
+
